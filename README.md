@@ -1,3 +1,21 @@
+# Vencord Remastered
+
+Vencord Remastered is an unofficial community fork of [Vencord](https://github.com/Vendicated/Vencord) that adds a launcher-managed third-party plugin workflow while remaining closely synchronized with upstream Vencord. Normal Vencord features, official plugins, settings and APIs remain available.
+
+Download and manage installations with **[Vencord Remastered Launcher](https://github.com/rafaelreverberi/vencord-remastered-launcher/releases)**. The launcher detects Discord, copies plugins into persistent storage, builds them into `src/userplugins`, and patches Discord only after a successful build. It includes the build toolchain; normal use needs no terminal commands.
+
+```text
+Vencord upstream → Remastered → Launcher adds persistent userplugins → build → Discord
+```
+
+Third-party plugins are unreviewed code and can access Discord and native system APIs. Only install sources you trust, at your own risk. New plugins start disabled. Safe Mode builds without third-party plugins while preserving their source and settings. Close Discord before applying a build or changing enabled states from the launcher.
+
+This project is **not affiliated with official Vencord or Discord**. Vencord is Copyright Vendicated and contributors; original attribution is retained below. Both repositories are distributed under GPL-3.0-or-later; corresponding source and changes are public. [Architecture and upstream conflict guide](docs/REMASTERED_ARCHITECTURE.md).
+
+Launcher v0.1.0 is an initial community release. See the launcher's validation report for host and signing limitations; test artifacts are not evidence of every supported platform's live installation.
+
+---
+
 # Vencord
 
 ![](https://img.shields.io/github/package-json/v/Vendicated/Vencord?style=for-the-badge&logo=github&logoColor=d3869b&label=&color=1d2021&labelColor=282828)
