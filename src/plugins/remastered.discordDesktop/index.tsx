@@ -13,7 +13,7 @@ import { RemasteredSettings } from "../../remastered/Settings";
 export default definePlugin({
     name: "Remastered",
     description: "Launcher-managed updates and persistent third-party plugins.",
-    authors: [{ name: "rafaelreverberi", id: 0n }],
+    authors: [], // Maintainer attribution is in README; upstream registry requires registered Discord IDs.
     required: true,
     start() {
         SettingsPlugin.customEntries.push({
