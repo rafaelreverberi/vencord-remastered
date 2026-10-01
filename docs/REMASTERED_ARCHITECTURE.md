@@ -57,8 +57,8 @@ The launcher directory in this development workspace is a separate Git repositor
 excluded locally from the fork, and is not part of Vencord's source distribution.
 
 Minimal fork integration: `src/remastered` contains the native/client integration;
-`src/plugins/remastered` registers it as a normal required desktop plugin, with a
-native re-export. No upstream core file needs modification. All official plugins
+`src/plugins/remastered.discordDesktop` registers it as a normal required desktop plugin, with a
+native re-export. The desktop suffix excludes the integration from web/other hosts. No upstream core file needs modification. All official plugins
 and APIs are retained. Builds pass `--disable-updater` so neither git nor HTTP
 updater registers update handlers. Remastered adds its own settings entry and a
 single update check when the settings panel opens. There is no timer/background daemon.
@@ -96,6 +96,8 @@ are sufficient to recreate the user's installation.
 Serialize all mutations in the launcher main process; single-instance lock prevents
 multiple launchers racing. Persistent JSON files are replaced by same-directory
 rename. Reject malformed metadata and symlinks/special files in imported trees.
+Single nested plugin roots are detected without executing code. Desktop target suffixes
+are preserved; incompatible web/vesktop/dev-only targets are rejected.
 Only HTTPS Git URLs without credentials are accepted; Git uses an empty config,
 disabled hooks, no submodules, no credential helpers or filters, and safe argv.
 Git snapshots are checked out without invoking repository shell scripts.
@@ -120,7 +122,10 @@ file hashes and immutable manifest. Rename staging to final build only after suc
 A failed build leaves the active loader and Discord ASAR untouched. Diagnostics include
 build output and source plugin paths; UI offers exclusion/removal/retry/safe mode.
 
-Before patching, require Discord to be closed. Prepare ASAR and loader in temporary
+Electron ASAR virtualization must be bypassed with original-fs for patch operations.
+Before patching, require Discord to be closed. On macOS, the app declares
+NSAppBundlesUsageDescription; App Management approval is an OS-owned requirement.
+Permission failures explain how to open System Settings without changing permissions. Prepare ASAR and loader in temporary
 files, journal the transaction, retain original ASAR and previous loader, and publish
 with rollback on error. The stable loader resolves a validated immutable bundle;
 this also permits the upstream Discord host-update persistence hook to reuse it.
@@ -163,4 +168,10 @@ A fresh managed checkout integration builds real Vencord with multiple sample pl
 checks cache reuse, compilation failure preserving the loader, safe mode, and source
 recreation. Real Discord execution and each OS's packaged app require host-specific
 smoke verification; fixture ASAR checks alone do not prove Discord UI/plugin rendering.
-See launcher docs/TESTING.md and VALIDATION.md for actual evidence and remaining gaps.
+Verified on the development macOS arm64 host: a packaged launcher detected and
+patched real Discord; a Git sample plugin was imported, persisted, built and patched,
+appeared in normal Vencord settings, and was enabled/disabled in-client. The Remastered
+settings page loaded and its fixed update link opened the launcher. Existing settings
+remained available. Direct Finder-launched writes exposed macOS App Management
+requirements, handled explicitly in the app. See launcher docs/TESTING.md and
+VALIDATION.md for actual evidence and remaining gaps.
