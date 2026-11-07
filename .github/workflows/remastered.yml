@@ -16,7 +16,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm testTsc
+      - run: pnpm test:ts
       - run: pnpm lint
       - run: pnpm build --disable-updater
       - run: pnpm buildWeb
