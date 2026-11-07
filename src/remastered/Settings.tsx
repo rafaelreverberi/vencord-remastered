@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Button, React, useEffect, useState } from "@webpack/common";
+import { Button } from "@components/Button";
+import { React, useEffect, useState } from "@webpack/common";
 
 import gitHash from "~git-hash";
 

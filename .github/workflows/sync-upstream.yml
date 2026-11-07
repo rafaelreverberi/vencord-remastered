@@ -11,51 +11,74 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: main
-      - name: Fetch and merge in disposable checkout
-        id: merge
-        shell: bash
-        run: |
-          git config user.name 'Vencord Remastered sync'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git remote add upstream https://github.com/Vendicated/Vencord.git
-          git fetch upstream main
-          if git merge-base --is-ancestor upstream/main HEAD; then
-            echo 'changed=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo 'changed=true' >> "$GITHUB_OUTPUT"
-          if ! git merge --no-edit upstream/main; then
-            mkdir -p sync-diagnostics
-            git status --porcelain > sync-diagnostics/conflicts.txt
-            git diff --binary > sync-diagnostics/conflict.diff
-            git log -10 --oneline > sync-diagnostics/history.txt
-            echo 'Upstream conflicts require manual resolution. Remastered main is unchanged.' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
       - uses: pnpm/action-setup@v6
-        if: steps.merge.outputs.changed == 'true'
       - uses: actions/setup-node@v6
-        if: steps.merge.outputs.changed == 'true'
         with:
           node-version: 24
           cache: pnpm
-      - name: Validate merged fork
-        if: steps.merge.outputs.changed == 'true'
+      - name: Merge, validate and publish with races handled
+        shell: bash
         run: |
-          pnpm install --frozen-lockfile
-          pnpm test
-          pnpm buildWeb
-          pnpm build --disable-updater
-      - name: Publish validated merge without force
-        if: steps.merge.outputs.changed == 'true'
-        run: git push origin HEAD:main
+          set -o pipefail
+          git config user.name 'Vencord Remastered sync'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add upstream https://github.com/Vendicated/Vencord.git
+          : > build.log
+          for attempt in 1 2 3; do
+            echo "=== Attempt $attempt ==="
+            # Always start from a fresh, bounded view of both heads; a move between the
+            # validation and the publish step invalidates the merge and restarts the loop.
+            git fetch --prune origin main || exit 1
+            git fetch upstream main || exit 1
+            base=$(git rev-parse refs/remotes/origin/main)
+            if git merge-base --is-ancestor refs/remotes/upstream/main "$base"; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo '### Upstream sync' >> "$GITHUB_STEP_SUMMARY"
+              echo 'main already contains upstream/main; nothing to merge.' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            git checkout --detach "$base"
+            if ! git merge --no-edit refs/remotes/upstream/main; then
+              mkdir -p sync-diagnostics
+              git status --porcelain > sync-diagnostics/conflicts.txt || true
+              git diff --binary > sync-diagnostics/conflict.diff || true
+              git log -20 --oneline > sync-diagnostics/history.txt || true
+              echo '### Upstream sync' >> "$GITHUB_STEP_SUMMARY"
+              echo 'Upstream conflicts require manual resolution. Remastered main was not modified.' >> "$GITHUB_STEP_SUMMARY"
+              echo 'changed=false' >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            merged=$(git rev-parse HEAD)
+            if pnpm install --frozen-lockfile 2>&1 | tee -a build.log \
+              && pnpm test 2>&1 | tee -a build.log \
+              && pnpm buildWeb 2>&1 | tee -a build.log \
+              && pnpm build --disable-updater 2>&1 | tee -a build.log; then
+              if git push origin "$merged:refs/heads/main"; then
+                echo "changed=true" >> "$GITHUB_OUTPUT"
+                echo '### Upstream sync' >> "$GITHUB_STEP_SUMMARY"
+                echo "Validated merge of \`upstream/main\` published as \`$merged\` (attempt $attempt)." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+              echo "origin/main moved while validating (attempt $attempt); restarting the merge." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "Validation failed on the merged tree (attempt $attempt)." >> "$GITHUB_STEP_SUMMARY"
+              tail -n 60 build.log > sync-diagnostics-validation.log || true
+              break
+            fi
+          done
+          mkdir -p sync-diagnostics
+          mv sync-diagnostics-validation.log sync-diagnostics/build-tail.log 2>/dev/null || true
+          echo '### Upstream sync' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Validation failed. Remastered main was not modified. See the diagnostics artifact.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'changed=false' >> "$GITHUB_OUTPUT"
+          exit 1
       - name: Preserve conflict diagnostics
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: upstream-sync-diagnostics
